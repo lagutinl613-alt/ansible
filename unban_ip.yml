@@ -1,9 +1,8 @@
 - name: Unban IP on all servers
   hosts: all
-  become: true
+  become: yes
   vars:
-    ban_ip: "1.2.3.4"
+    ban_ip: "1.2.3.4"   # передашь через extra vars в шаблоне
   tasks:
-    - name: Remove IP from banlist (if present)
-      command: ipset del banlist {{ ban_ip }}
-      ignore_errors: true
+    - name: Remove IP from banlist if present
+      shell: ipset del banlist {{ ban_ip }} || true
