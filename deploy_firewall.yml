@@ -1,0 +1,16 @@
+- name: Prepare ban infrastructure
+  hosts: all
+  become: true
+  tasks:
+    - name: Ensure ipset installed
+      package:
+        name: ipset
+        state: present
+
+    - name: Ensure banlist set exists (1h default)
+      command: ipset create banlist hash:ip timeout 3600 -exist
+
+    - name: Ensure drop rule via banlist exists
+      shell: |
+        iptables -C INPUT -m set --match-set banlist src -j DROP || \
+        iptables -I INPUT -m set --match-set banlist src -j DROP
