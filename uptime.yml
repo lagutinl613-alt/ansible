@@ -1,0 +1,5 @@
+- name: Check uptime
+  hosts: all
+  tasks:
+    - name: Show uptime
+      ansible.builtin.command: uptime
