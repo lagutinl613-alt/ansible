@@ -1,0 +1,9 @@
+- name: Unban IP on all servers
+  hosts: all
+  become: true
+  vars:
+    ban_ip: "1.2.3.4"
+  tasks:
+    - name: Remove IP from banlist (if present)
+      command: ipset del banlist {{ ban_ip }}
+      ignore_errors: true
