@@ -1,0 +1,16 @@
+- name: Ban IPs or networks on all servers
+  hosts: all
+  become: true
+  vars:
+    ban_list:
+      - "1.2.3.4"
+      - "5.6.7.8"
+      - "192.168.0.0/24"
+    ban_time: 3600
+  tasks:
+    - name: Ensure banlist exists with desired timeout
+      command: ipset create banlist hash:net timeout {{ ban_time }} -exist
+
+    - name: Add IPs or networks to banlist
+      loop: "{{ ban_list }}"
+      command: ipset add banlist {{ item }} timeout {{ ban_time }} -exist
