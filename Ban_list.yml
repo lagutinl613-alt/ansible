@@ -2,16 +2,21 @@
   hosts: all
   become: true
   vars:
-    ban_list_raw: ""   # переменная придет из Survey
-    ban_time: 3600     # переменная тоже может быть из Survey
+    ban_list_raw: ""   # приходит из Survey
+    ban_time: 3600     # приходит из Survey
   tasks:
     - name: Ensure banlist exists with desired timeout
-      command: ipset create banlist hash:net timeout {{ ban_time }} -exist
+      command: ipset create banlist hash:net family inet timeout {{ ban_time }} -exist
 
     - name: Convert comma-separated string into list
       set_fact:
-        ban_list: "{{ ban_list_raw.split(',') | map('trim') | list }}"
+        ban_list: "{{ ban_list_raw | split(',') | map('trim') | list }}"
+
+    - name: Debug (check what ban_list looks like)
+      debug:
+        var: ban_list
 
     - name: Add IPs or networks to banlist
       loop: "{{ ban_list }}"
+      when: item | length > 0
       command: ipset add banlist {{ item }} timeout {{ ban_time }} -exist
