@@ -2,21 +2,57 @@
   hosts: all
   become: true
   vars:
-    ban_list_raw: ""   # приходит из Survey
-    ban_time: 3600     # приходит из Survey
+    ban_list_raw: ""      # из Survey: "1.2.3.4, 10.0.0.0/8"
+    ban_time: 3600        # из Survey
   tasks:
-    - name: Ensure banlist exists with desired timeout
-      command: ipset create banlist hash:net family inet timeout {{ ban_time }} -exist
+    - name: Ensure ipset installed
+      package:
+        name: ipset
+        state: present
 
-    - name: Convert comma-separated string into list
+    - name: Normalize input into a list
       set_fact:
-        ban_list: "{{ ban_list_raw | split(',') | map('trim') | list }}"
+        ban_list: "{{ ban_list_raw | split(',') | map('trim') | reject('equalto','') | list }}"
 
-    - name: Debug (check what ban_list looks like)
-      debug:
-        var: ban_list
+    - name: Check if banlist exists
+      command: ipset list banlist
+      register: banlist_info
+      failed_when: false
+      changed_when: false
 
-    - name: Add IPs or networks to banlist
+    - name: Detect current set type (if exists)
+      shell: "ipset list banlist | awk '/^Type:/ {print $2}'"
+      register: banlist_type
+      when: banlist_info.rc == 0
+      changed_when: false
+
+    - name: Create banlist as hash:net if not exists
+      command: ipset create banlist hash:net timeout {{ ban_time }} -exist
+      when: banlist_info.rc != 0
+
+    - name: Migrate existing banlist to hash:net if wrong type
+      when: banlist_info.rc == 0 and banlist_type.stdout != 'hash:net'
+      block:
+        - name: Export current entries
+          shell: "ipset save banlist | awk '/^add /{print $0}'"
+          register: ban_entries
+          changed_when: false
+
+        - name: Destroy old banlist
+          command: ipset destroy banlist
+
+        - name: Re-create banlist as hash:net
+          command: ipset create banlist hash:net timeout {{ ban_time }}
+
+        - name: Restore previous entries
+          when: ban_entries.stdout | length > 0
+          loop: "{{ ban_entries.stdout_lines }}"
+          loop_control:
+            label: "{{ item }}"
+          command: "{{ item }}"
+
+    - name: Add new IPs or networks to banlist
       loop: "{{ ban_list }}"
-      when: item | length > 0
+      loop_control:
+        label: "{{ item }}"
       command: ipset add banlist {{ item }} timeout {{ ban_time }} -exist
