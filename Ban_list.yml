@@ -2,14 +2,15 @@
   hosts: all
   become: true
   vars:
-    ban_list:
-      - "1.2.3.4"
-      - "5.6.7.8"
-      - "192.168.0.0/24"
-    ban_time: 3600
+    ban_list_raw: ""   # переменная придет из Survey
+    ban_time: 3600     # переменная тоже может быть из Survey
   tasks:
     - name: Ensure banlist exists with desired timeout
       command: ipset create banlist hash:net timeout {{ ban_time }} -exist
+
+    - name: Convert comma-separated string into list
+      set_fact:
+        ban_list: "{{ ban_list_raw.split(',') | map('trim') | list }}"
 
     - name: Add IPs or networks to banlist
       loop: "{{ ban_list }}"
