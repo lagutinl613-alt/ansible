@@ -10,6 +10,3 @@
 
     - name: Add IP with timeout (auto-expires)
       command: ipset add banlist {{ ban_ip }} timeout {{ ban_time }} -exist
-- name: Save ipset to file
-  become: true
-  shell: ipset save > /etc/ipset.rules
