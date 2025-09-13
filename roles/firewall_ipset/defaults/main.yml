@@ -1,0 +1,5 @@
+fw_ipset_name: banlist
+fw_ipset_timeout: 3600                  # TTL бана по умолчанию; переопределяйте в AWX
+fw_persist_rules: true
+fw_chain: INPUT
+fw_default_accept_ssh_from: []          # Доверенные подсети/адреса — задайте в AWX

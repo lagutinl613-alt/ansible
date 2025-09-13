@@ -1,0 +1,7 @@
+common_timezone: Europe/Berlin
+common_packages: [curl, vim, htop, chrony, ca-certificates]
+
+baseline_admin_user: ansible
+baseline_admin_ssh_pubkey: ""          # Задайте в AWX (Credential / Inventory Vars), в Git не хранить
+baseline_passwordless_sudo: true
+baseline_disable_password_ssh: true

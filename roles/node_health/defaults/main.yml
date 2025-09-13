@@ -1,0 +1,3 @@
+health_min_disk_free_pct: 15
+health_max_load_per_core: 2.0
+health_alert_webhook: ""                # Если нужны уведомления — задайте в AWX
