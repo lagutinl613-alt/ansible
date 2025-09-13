@@ -1,4 +1,4 @@
-common_timezone: Europe/Berlin
+common_timezone: Europe/Moscow
 common_packages: [curl, vim, htop, chrony, ca-certificates]
 
 baseline_admin_user: ansible
