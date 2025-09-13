@@ -6,3 +6,6 @@
   tasks:
     - name: Remove IP from banlist if present
       shell: ipset del banlist {{ ban_ip }} || true
+- name: Save ipset to file
+  become: true
+  shell: ipset save > /etc/ipset.rules

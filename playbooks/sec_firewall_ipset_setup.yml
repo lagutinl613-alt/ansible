@@ -1,0 +1,105 @@
+- name: Prepare ban infrastructure
+  hosts: all
+  become: true
+  vars:
+    ban_time: 3600
+  tasks:
+    - name: Check if ipset exists
+      command: which ipset
+      register: ipset_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install ipset on Debian/Ubuntu (only if missing)
+      apt:
+        name: ipset
+        state: present
+        update_cache: yes
+      when:
+        - ipset_check.rc != 0
+        - ansible_facts.os_family == "Debian"
+      ignore_errors: true   # чтобы не падать на битых репах
+
+    - name: Install ipset on RHEL-like (only if missing)
+      package:
+        name: ipset
+        state: present
+      when:
+        - ipset_check.rc != 0
+        - ansible_facts.os_family in ["RedHat", "Rocky", "AlmaLinux", "Suse"]
+
+    - name: Ensure banlist set exists
+      command: ipset create banlist hash:ip timeout {{ ban_time }} -exist
+
+    - name: Ensure drop rule via banlist exists (iptables/nft)
+      shell: |
+        if command -v iptables >/dev/null 2>&1; then
+          iptables -C INPUT -m set --match-set banlist src -j DROP || \
+          iptables -I INPUT -m set --match-set banlist src -j DROP
+        elif command -v nft >/dev/null 2>&1; then
+          nft list table inet filter >/dev/null 2>&1 || nft add table inet filter
+          nft list set inet filter banlist >/dev/null 2>&1 || \
+            nft 'add set inet filter banlist { type ipv4_addr; timeout {{ ban_time }}; flags timeout; }'
+          nft list chain inet filter input >/dev/null 2>&1 || \
+            nft 'add chain inet filter input { type filter hook input priority 0; }'
+          nft 'add rule inet filter input ip saddr @banlist drop' 2>/dev/null || true
+        fi
+      args: { executable: /bin/bash }
+- name: Persist ipset & firewall across reboots
+  become: true
+  block:
+    - name: Ensure ipset rules file exists
+      copy:
+        dest: /etc/ipset.rules
+        content: |
+          # ipset save
+      mode: '0644'
+
+    - name: Create restore script
+      copy:
+        dest: /usr/local/sbin/restore_firewall.sh
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          set -e
+          # ensure banlist exists
+          if command -v ipset >/dev/null 2>&1; then
+            ipset list banlist >/dev/null 2>&1 || ipset create banlist hash:ip timeout {{ ban_time | default(3600) }}
+            [ -f /etc/ipset.rules ] && ipset restore < /etc/ipset.rules || true
+          fi
+          # ensure drop rule (iptables or nft)
+          if command -v iptables >/dev/null 2>&1; then
+            iptables -C INPUT -m set --match-set banlist src -j DROP 2>/dev/null || \
+            iptables -I INPUT -m set --match-set banlist src -j DROP
+          elif command -v nft >/dev/null 2>&1; then
+            nft list table inet filter >/dev/null 2>&1 || nft add table inet filter
+            nft list set inet filter banlist >/dev/null 2>&1 || \
+              nft 'add set inet filter banlist { type ipv4_addr; timeout {{ ban_time | default(3600) }}; flags timeout; }'
+            nft list chain inet filter input >/dev/null 2>&1 || \
+              nft 'add chain inet filter input { type filter hook input priority 0; }'
+            nft 'add rule inet filter input ip saddr @banlist drop' 2>/dev/null || true
+          fi
+
+    - name: Systemd unit for restore
+      copy:
+        dest: /etc/systemd/system/firewall-restore.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Restore ipset and firewall rules on boot
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/restore_firewall.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start restore service
+      systemd:
+        name: firewall-restore.service
+        enabled: true
+        state: started
