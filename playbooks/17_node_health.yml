@@ -1,0 +1,6 @@
+---
+- name: Node health check
+  hosts: all
+  gather_facts: yes
+  roles:
+    - node_health

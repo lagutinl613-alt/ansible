@@ -1,0 +1,86 @@
+---
+- name: Install iptables/ipset
+  package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ ['ipset','iptables'] if ansible_os_family in ['Debian','RedHat'] else ['ipset'] }}"
+  become: true
+
+- name: Create ipset (idempotent)
+  command: "ipset create {{ fw_ipset_name }} hash:ip timeout {{ fw_ipset_timeout }}"
+  args:
+    warn: false
+  register: ipset_create
+  changed_when: "'created' in ipset_create.stderr or ipset_create.rc == 0"
+  failed_when: ipset_create.rc not in [0,1] and ('Set cannot be created' not in ipset_create.stderr)
+  ignore_errors: true
+  become: true
+
+- name: Ensure firewall base allow for SSH from trusted subnets
+  iptables:
+    chain: "{{ fw_chain }}"
+    source: "{{ item }}"
+    protocol: tcp
+    destination_port: "22"
+    jump: ACCEPT
+    state: present
+  loop: "{{ fw_default_accept_ssh_from | default([]) }}"
+  become: true
+
+- name: Ensure DROP via ipset
+  iptables:
+    chain: "{{ fw_chain }}"
+    match: set
+    match_set: "{{ fw_ipset_name }} src"
+    jump: DROP
+    state: present
+  become: true
+
+- name: Persist ipset & iptables across reboots (systemd unit)
+  when: fw_persist_rules | bool
+  block:
+    - name: Save ipset to file (create placeholder)
+      copy:
+        dest: /etc/ipset.rules
+        content: |
+          # ipset save
+      mode: '0644'
+      become: true
+
+    - name: Create persist script
+      copy:
+        dest: /usr/local/sbin/restore_firewall.sh
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          set -e
+          ipset list {{ fw_ipset_name }} >/dev/null 2>&1 || ipset create {{ fw_ipset_name }} hash:ip timeout {{ fw_ipset_timeout }}
+          [ -f /etc/ipset.rules ] && ipset restore < /etc/ipset.rules || true
+          iptables -C {{ fw_chain }} -m set --match-set {{ fw_ipset_name }} src -j DROP 2>/dev/null ||           iptables -I {{ fw_chain }} -m set --match-set {{ fw_ipset_name }} src -j DROP
+      become: true
+
+    - name: Create systemd service
+      copy:
+        dest: /etc/systemd/system/firewall-restore.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Restore ipset and firewall rules
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/restore_firewall.sh
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+      become: true
+
+    - name: Enable service
+      systemd:
+        name: firewall-restore.service
+        enabled: true
+        state: started
+      become: true

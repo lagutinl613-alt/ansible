@@ -1,0 +1,67 @@
+---
+- name: Ensure baseline packages
+  package:
+    name: "{{ common_packages }}"
+    state: present
+  become: true
+
+- name: Set timezone
+  timezone:
+    name: "{{ common_timezone }}"
+  become: true
+
+- name: Enable & start chrony
+  service:
+    name: "{{ 'chrony' if ansible_os_family == 'Debian' else 'chronyd' }}"
+    enabled: true
+    state: started
+  become: true
+
+- name: Create admin user
+  user:
+    name: "{{ baseline_admin_user }}"
+    shell: /bin/bash
+    state: present
+    create_home: true
+  become: true
+
+- name: Authorized key for admin user
+  authorized_key:
+    user: "{{ baseline_admin_user }}"
+    key: "{{ baseline_admin_ssh_pubkey }}"
+    state: present
+  become: true
+
+- name: Allow passwordless sudo (optional)
+  copy:
+    dest: "/etc/sudoers.d/99-{{ baseline_admin_user }}"
+    content: "{{ baseline_admin_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: '0440'
+  when: baseline_passwordless_sudo | bool
+  become: true
+
+- name: Harden SSH (disable password auth) (optional)
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PasswordAuthentication\s+'
+    line: 'PasswordAuthentication no'
+    create: no
+    backrefs: no
+  when: baseline_disable_password_ssh | bool
+  notify: restart ssh
+  become: true
+
+- name: Ensure nofile limits for reliability
+  copy:
+    dest: /etc/security/limits.d/99-nofile.conf
+    content: |
+      * soft nofile 65536
+      * hard nofile 65536
+    mode: '0644'
+  become: true
+
+- name: Update APT cache (Debian/Ubuntu)
+  apt:
+    update_cache: yes
+  when: ansible_os_family == 'Debian'
+  become: true

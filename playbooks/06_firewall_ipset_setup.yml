@@ -1,0 +1,6 @@
+---
+- name: Setup firewall + ipset on agents
+  hosts: agents
+  gather_facts: yes
+  roles:
+    - firewall_ipset

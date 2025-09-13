@@ -1,0 +1,6 @@
+---
+- name: Baseline onboarding
+  hosts: agents
+  gather_facts: yes
+  roles:
+    - baseline_onboarding

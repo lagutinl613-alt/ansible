@@ -1,0 +1,28 @@
+# Общие настройки для всех узлов
+common_timezone: Europe/Berlin
+common_packages:
+  - curl
+  - vim
+  - htop
+  - chrony
+  - ca-certificates
+
+# SSH/пользователи
+baseline_admin_user: ansible
+baseline_admin_ssh_pubkey: "ssh-ed25519 AAAA... your_public_key_here ..."
+baseline_passwordless_sudo: true
+baseline_disable_password_ssh: true
+
+# Firewall/ipset
+fw_ipset_name: banlist
+fw_ipset_timeout: 3600
+fw_persist_rules: true
+fw_chain: INPUT
+fw_default_accept_ssh_from:
+  - "10.0.0.0/24"
+  - "192.168.0.0/24"
+
+# Node health
+health_min_disk_free_pct: 15
+health_max_load_per_core: 2.0
+health_alert_webhook: ""
