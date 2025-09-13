@@ -60,8 +60,3 @@
     mode: '0644'
   become: true
 
-- name: Update APT cache (Debian/Ubuntu)
-  apt:
-    update_cache: yes
-  when: ansible_os_family == 'Debian'
-  become: true
