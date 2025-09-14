@@ -1,6 +1,8 @@
 - name: Add IPs or networks to banlist
   hosts: all
   become: true
+  collections:
+    - community.general
   vars:
     ban_list_raw: ""    # вводится через Survey: "1.2.3.4, 10.0.0.0/8"
     ban_time: 3600      # время в секундах (также через Survey)
@@ -10,7 +12,11 @@
         ban_list: "{{ ban_list_raw.split(',') | map('trim') | reject('equalto','') | list }}"
 
     - name: Add each IP or network to banlist
+      community.general.ipset:
+        name: banlist
+        state: present
+        entry: "{{ item }}"
+        timeout: "{{ ban_time }}"
       loop: "{{ ban_list }}"
       loop_control:
         label: "{{ item }}"
-      command: ipset add banlist {{ item }} timeout {{ ban_time }} -exist

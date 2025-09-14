@@ -1,11 +1,18 @@
 - name: Unban IP on all servers
   hosts: all
   become: yes
+  collections:
+    - community.general
   vars:
     ban_ip: "1.2.3.4"   # передашь через extra vars в шаблоне
   tasks:
     - name: Remove IP from banlist if present
-      shell: ipset del banlist {{ ban_ip }} || true
-- name: Save ipset to file
-  become: true
-  shell: ipset save > /etc/ipset.rules
+      community.general.ipset:
+        name: banlist
+        entry: "{{ ban_ip }}"
+        state: absent
+
+    - name: Save ipset to file
+      shell: ipset save > /etc/ipset.rules
+      changed_when: false
+      become: true
