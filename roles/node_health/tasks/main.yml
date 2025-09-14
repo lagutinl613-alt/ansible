@@ -67,3 +67,21 @@
     body: "{{ {'host': inventory_hostname, 'report': health_report} }}"
   when: health_alert_webhook | length > 0
   changed_when: false
+
+# Final concise summary per host
+- name: Build service state shortcuts
+  set_fact:
+    svc_ssh: "{{ (ansible_facts.services | default({}) | dict2items | selectattr('key','equalto','ssh') | map(attribute='value') | map(attribute='state') | list | first | default('unknown')) }}"
+    svc_cron: "{{ (ansible_facts.services | default({}) | dict2items | selectattr('key','equalto','cron') | map(attribute='value') | map(attribute='state') | list | first | default('unknown')) }}"
+
+- name: Build concise health summary line
+  set_fact:
+    health_summary_line: >-
+      Summary: {{ health_report.host }} | OS {{ health_report.os }} | CPU {{ health_report.cpu_cores }}c |
+      Load {{ health_report.load1 | float | round(2) }}/{{ max_load | float | round(2) }} {{ 'ok' if health_report.load_ok else 'high' }} |
+      Mem {{ health_report.mem_mb_free }} / {{ health_report.mem_mb_total }} MB ({{ health_report.mem_free_pct | float | round(1) }}% free) |
+      Services: ssh={{ svc_ssh }}, cron={{ svc_cron }}
+
+- name: Final summary
+  debug:
+    msg: "{{ health_summary_line }}"
