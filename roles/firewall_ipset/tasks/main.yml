@@ -7,13 +7,11 @@
   become: true
 
 - name: Create ipset (idempotent)
-  command: "ipset create {{ fw_ipset_name }} hash:ip timeout {{ fw_ipset_timeout }}"
-  args:
-    warn: false
-  register: ipset_create
-  changed_when: "'created' in ipset_create.stderr or ipset_create.rc == 0"
-  failed_when: ipset_create.rc not in [0,1] and ('Set cannot be created' not in ipset_create.stderr)
-  ignore_errors: true
+  community.general.ipset:
+    name: "{{ fw_ipset_name }}"
+    state: present
+    set_type: hash:ip
+    timeout: "{{ fw_ipset_timeout }}"
   become: true
 
 - name: Ensure firewall base allow for SSH from trusted subnets
@@ -83,4 +81,5 @@
         name: firewall-restore.service
         enabled: true
         state: started
+        daemon_reload: true
       become: true

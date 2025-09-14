@@ -1,6 +1,8 @@
 - name: Prepare ban infrastructure
   hosts: all
   become: true
+  collections:
+    - community.general
   vars:
     ban_time: 3600
   tasks:
@@ -29,7 +31,11 @@
         - ansible_facts.os_family in ["RedHat", "Rocky", "AlmaLinux", "Suse"]
 
     - name: Ensure banlist set exists
-      command: ipset create banlist hash:ip timeout {{ ban_time }} -exist
+      community.general.ipset:
+        name: banlist
+        state: present
+        set_type: hash:ip
+        timeout: "{{ ban_time }}"
 
     - name: Ensure drop rule via banlist exists (iptables/nft)
       shell: |
@@ -103,3 +109,4 @@
         name: firewall-restore.service
         enabled: true
         state: started
+        daemon_reload: true

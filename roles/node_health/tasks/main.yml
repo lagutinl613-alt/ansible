@@ -3,15 +3,8 @@
   setup:
 
 - name: Collect disk usage
-  command: "df -P -x squashfs -x tmpfs -x devtmpfs"
-  register: disk_df
-  changed_when: false
-
-- name: Parse loadavg
-  slurp:
-    src: /proc/loadavg
-  register: loadavg_raw
-  changed_when: false
+  set_fact:
+    disk_info: "{{ ansible_mounts }}"
 
 - name: Compute thresholds
   set_fact:
@@ -19,20 +12,18 @@
     max_load: "{{ (health_max_load_per_core | float) * (ansible_facts.processor_vcpus | default(ansible_facts.processor_count|default(1))) | float }}"
 
 - name: Build report
-  vars:
-    load_line: "{{ (loadavg_raw['content'] | b64decode).split()[0] | float }}"
   set_fact:
     health_report:
       host: "{{ inventory_hostname }}"
       os: "{{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}"
       uptime: "{{ ansible_facts.uptime_seconds | int }}"
       cpu_cores: "{{ cpu_cores }}"
-      load1: "{{ load_line }}"
-      load_ok: "{{ load_line | float <= max_load | bool }}"
+      load1: "{{ ansible_loadavg['1'] }}"
+      load_ok: "{{ ansible_loadavg['1'] | float <= max_load | bool }}"
       mem_mb_total: "{{ ansible_facts.memtotal_mb }}"
       mem_mb_free: "{{ ansible_facts.memfree_mb }}"
       mem_free_pct: "{{ (ansible_facts.memfree_mb / (ansible_facts.memtotal_mb|float)) * 100.0 }}"
-      disks_raw: "{{ disk_df.stdout_lines }}"
+      disks_raw: "{{ disk_info }}"
       time: "{{ ansible_date_time.iso8601 }}"
 
 - name: Summarize and print
@@ -41,7 +32,7 @@
       - "Host: {{ health_report.host }} ({{ health_report.os }})"
       - "CPU cores: {{ health_report.cpu_cores }}, Load1: {{ health_report.load1 }} (<= {{ max_load | round(2) }} ok? {{ health_report.load_ok }})"
       - "Mem: {{ health_report.mem_mb_free }} / {{ health_report.mem_mb_total }} MB ({{ health_report.mem_free_pct | round(1) }}% free)"
-      - "Disks (df -P):"
+      - "Disks:"
       - "{{ health_report.disks_raw }}"
 
 - name: service facts
