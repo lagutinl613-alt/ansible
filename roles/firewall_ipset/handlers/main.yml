@@ -1,0 +1,7 @@
+---
+- name: Restart firewall-restore service
+  systemd:
+    name: firewall-restore.service
+    state: restarted
+    daemon_reload: true
+  become: true
