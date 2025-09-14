@@ -1,12 +1,22 @@
 - name: Ban IP on all servers
   hosts: all
   become: true
+  collections:
+    - community.general
   vars:
     ban_ip: "1.2.3.4"
     ban_time: 3600
   tasks:
     - name: Ensure banlist exists with desired timeout
-      command: ipset create banlist hash:ip timeout {{ ban_time }} -exist
+      community.general.ipset:
+        name: banlist
+        state: present
+        set_type: hash:ip
+        timeout: "{{ ban_time }}"
 
     - name: Add IP with timeout (auto-expires)
-      command: ipset add banlist {{ ban_ip }} timeout {{ ban_time }} -exist
+      community.general.ipset:
+        name: banlist
+        entry: "{{ ban_ip }}"
+        state: present
+        timeout: "{{ ban_time }}"
