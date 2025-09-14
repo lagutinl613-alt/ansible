@@ -2,11 +2,16 @@
   hosts: all
   become: true
   vars:
-    ban_ip: "1.2.3.4"
+    # Keep vars aligned with sec_ipset_ban_list.yml for AWX Survey compatibility
+    ban_list_raw: ""   # e.g. "1.2.3.4" or "1.2.3.4, 5.6.7.8"
     ban_time: 3600
   tasks:
-    - name: Ensure banlist exists with desired timeout
-      command: ipset create banlist hash:ip timeout {{ ban_time }} -exist
+    - name: Convert string to list
+      set_fact:
+        ban_list: "{{ ban_list_raw.split(',') | map('trim') | reject('equalto','') | list }}"
 
-    - name: Add IP with timeout (auto-expires)
-      command: ipset add banlist {{ ban_ip }} timeout {{ ban_time }} -exist
+    - name: Add each IP to banlist
+      loop: "{{ ban_list }}"
+      loop_control:
+        label: "{{ item }}"
+      command: ipset add banlist {{ item }} timeout {{ ban_time }} -exist

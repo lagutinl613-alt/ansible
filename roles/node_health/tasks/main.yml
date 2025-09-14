@@ -15,8 +15,8 @@
 
 - name: Compute thresholds
   set_fact:
-    cpu_cores: "{{ ansible_facts.processor_vcpus | default(ansible_facts.processor_count|default(1)) }}"
-    max_load: "{{ (health_max_load_per_core | float) * (ansible_facts.processor_vcpus | default(ansible_facts.processor_count|default(1))) | float }}"
+    cpu_cores: "{{ (ansible_facts.processor_vcpus | default(ansible_facts.processor_count | default(1))) | int }}"
+    max_load: "{{ (health_max_load_per_core | float) * ((ansible_facts.processor_vcpus | default(ansible_facts.processor_count | default(1))) | int) }}"
 
 - name: Build report
   vars:
@@ -28,7 +28,7 @@
       uptime: "{{ ansible_facts.uptime_seconds | int }}"
       cpu_cores: "{{ cpu_cores }}"
       load1: "{{ load_line }}"
-      load_ok: "{{ load_line | float <= max_load | bool }}"
+      load_ok: "{{ (load_line | float) <= (max_load | float) }}"
       mem_mb_total: "{{ ansible_facts.memtotal_mb }}"
       mem_mb_free: "{{ ansible_facts.memfree_mb }}"
       mem_free_pct: "{{ (ansible_facts.memfree_mb / (ansible_facts.memtotal_mb|float)) * 100.0 }}"
@@ -39,8 +39,8 @@
   debug:
     msg:
       - "Host: {{ health_report.host }} ({{ health_report.os }})"
-      - "CPU cores: {{ health_report.cpu_cores }}, Load1: {{ health_report.load1 }} (<= {{ max_load | round(2) }} ok? {{ health_report.load_ok }})"
-      - "Mem: {{ health_report.mem_mb_free }} / {{ health_report.mem_mb_total }} MB ({{ health_report.mem_free_pct | round(1) }}% free)"
+      - "CPU cores: {{ health_report.cpu_cores }}, Load1: {{ health_report.load1 }} (<= {{ max_load | float | round(2) }} ok? {{ health_report.load_ok }})"
+      - "Mem: {{ health_report.mem_mb_free }} / {{ health_report.mem_mb_total }} MB ({{ health_report.mem_free_pct | float | round(1) }}% free)"
       - "Disks (df -P):"
       - "{{ health_report.disks_raw }}"
 
