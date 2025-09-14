@@ -7,6 +7,9 @@
   tasks:
     - name: Ensure banlist exists with desired timeout
       command: ipset create banlist hash:ip timeout {{ ban_time }} -exist
+      register: ipset_create
+      changed_when: "'created' in ipset_create.stderr or ipset_create.rc == 0"
+      failed_when: ipset_create.rc not in [0,1] and ('Set cannot be created' not in ipset_create.stderr)
 
     - name: Add IP with timeout (auto-expires)
       command: ipset add banlist {{ ban_ip }} timeout {{ ban_time }} -exist
