@@ -5,11 +5,17 @@
     ban_ip: "1.2.3.4"
     ban_time: 3600
   tasks:
+    - name: Check for existing banlist
+      command: ipset list banlist
+      register: ipset_check
+      changed_when: false
+      failed_when: false
+
     - name: Ensure banlist exists with desired timeout
-      command: ipset create banlist hash:ip timeout {{ ban_time }} -exist
+      command: ipset create banlist hash:ip timeout {{ ban_time }}
+      when: ipset_check.rc != 0
       register: ipset_create
-      changed_when: "'created' in ipset_create.stderr or ipset_create.rc == 0"
-      failed_when: ipset_create.rc not in [0,1] and ('Set cannot be created' not in ipset_create.stderr)
+      changed_when: ipset_create.rc == 0
 
     - name: Add IP with timeout (auto-expires)
       command: ipset add banlist {{ ban_ip }} timeout {{ ban_time }} -exist
