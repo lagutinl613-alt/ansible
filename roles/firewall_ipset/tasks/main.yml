@@ -77,10 +77,12 @@
           [Install]
           WantedBy=multi-user.target
       become: true
+      notify: Restart firewall-restore service
 
     - name: Enable service
       systemd:
         name: firewall-restore.service
         enabled: true
         state: started
+        daemon_reload: true
       become: true
